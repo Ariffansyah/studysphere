@@ -1,3 +1,4 @@
 {
-  "build": "arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir firmware/build firmware"
+  "build": "arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir firmware/build firmware",
+  "engine": "local"
 }

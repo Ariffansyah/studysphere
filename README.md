@@ -92,16 +92,21 @@ Semua pengaturan jaringan ada di `firmware/config.h`: SSID dan password WiFi, ho
 
 ## Menjalankan
 
-### Di simulator (WireLab atau wokwi-cli)
+### Di simulator WireLab (lokal, tanpa kuota)
 
-Buka folder ini di WireLab lalu tekan **Run**. Bisa juga dari terminal:
+Buka folder ini di WireLab lalu tekan **Run**. Proyek ini memakai **simulator lokal** WireLab (`"engine": "local"` di `wirelab.json`):
+
+- Firmware di-compile untuk PC dan berjalan di PC, jadi tidak memakai server atau kuota Wokwi.
+- WiFi memakai koneksi internet PC, jadi MQTT tersambung ke broker sungguhan dan aplikasi desktop bisa langsung menerima datanya.
+- Sensor diatur dengan mengklik part saat simulasi berjalan: slider cahaya (LDR), CO2 (MQ-135), suhu dan kelembapan (DHT11), serta tombol gerakan (PIR). LED dan LCD ikut menampilkan hasilnya.
+- Syaratnya: compiler C++ (`g++` atau `clang++`) dan arduino-cli.
+
+Simulator lokal mensimulasikan perilaku, bukan chip-nya: timing sinyal DHT11 dan I2C LCD tidak disimulasikan (library-nya diganti versi tiruan yang memakai nilai dari WireLab). Untuk menguji di mesin Wokwi, ganti simulator di **Settings** (memakai kuota CI: akun Free mendapat 50 menit per 30 hari), atau jalankan:
 
 ```sh
 arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir firmware/build firmware
 wokwi-cli --scenario test.scenario.yaml --timeout 60000 .
 ```
-
-Simulasi memakai kuota CI Wokwi: akun Free mendapat 50 menit simulasi per 30 hari (bergulir). Hemat kuota dengan menjalankan simulasi hanya saat perlu.
 
 ### Di ESP32 asli
 

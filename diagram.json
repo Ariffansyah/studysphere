@@ -42,11 +42,38 @@
     {
       "type": "chip-dht11",
       "id": "dht1",
-      "top": -40,
-      "left": 260,
+      "top": -1,
+      "left": 290,
       "attrs": {
         "temperature": "25",
         "humidity": "50"
+      }
+    },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd1",
+      "top": 200,
+      "left": 250,
+      "attrs": {
+        "pins": "i2c"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": -110,
+      "left": 190,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led1",
+      "top": -170,
+      "left": 300,
+      "attrs": {
+        "color": "yellow"
       }
     }
   ],
@@ -129,18 +156,6 @@
       ]
     ],
     [
-      "ldr:DO",
-      "esp:25",
-      "blue",
-      [
-        "h-15",
-        "v-59",
-        "h212",
-        "v43",
-        "h198"
-      ]
-    ],
-    [
       "mq135:VCC",
       "esp:5V",
       "red",
@@ -173,16 +188,6 @@
       ]
     ],
     [
-      "mq135:DO",
-      "esp:26",
-      "blue",
-      [
-        "v15",
-        "h134",
-        "v-244"
-      ]
-    ],
-    [
       "dht1:VCC",
       "esp:3V3",
       "red",
@@ -198,6 +203,48 @@
       "dht1:DATA",
       "esp:4",
       "green",
+      []
+    ],
+    [
+      "lcd1:GND",
+      "esp:GND.3",
+      "black",
+      []
+    ],
+    [
+      "lcd1:VCC",
+      "esp:5V",
+      "red",
+      []
+    ],
+    [
+      "lcd1:SDA",
+      "esp:21",
+      "green",
+      []
+    ],
+    [
+      "lcd1:SCL",
+      "esp:22",
+      "blue",
+      []
+    ],
+    [
+      "esp:13",
+      "r1:1",
+      "orange",
+      []
+    ],
+    [
+      "r1:2",
+      "led1:A",
+      "orange",
+      []
+    ],
+    [
+      "led1:C",
+      "esp:GND.2",
+      "black",
       []
     ]
   ],

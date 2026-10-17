@@ -1,24 +1,18 @@
-# End-to-end check of firmware + custom chips:
-#   wokwi-cli --scenario test.scenario.yaml --timeout 20000 .
-name: IoT sensors
+# End-to-end check over Serial (the same JSON as over MQTT):
+#   wokwi-cli --scenario test.scenario.yaml --timeout 30000 .
+name: StudySphere room node
 version: 1
-author: wirelab
+author: utsuas
 
 steps:
-  - wait-serial: '{"temp":25.0,"hum":50.0,"lux":500,"ldr_do":0,"co2":400,"mq_do":1,"pir":0}'
+  - wait-serial: '"temperature":25,"humidity":50,"lighting":500,"co2":400,"air_quality":"good","occupancy":false'
 
-  - set-control:
-      part-id: dht1
-      control: temperature
-      value: 31
-  - set-control:
-      part-id: dht1
-      control: humidity
-      value: 72
-  - set-control:
-      part-id: mq135
-      control: ppm
-      value: 1200
+  # Semantic request, as the desktop app / LLM sends it.
+  - write-serial: '{"task":"comfort_check","required_information":["temperature","humidity","co2","noise"]}'
+  - write-serial: [10] # newline ends the line
+  - wait-serial: '{"task":"comfort_check","data":{"temperature":25,"humidity":50,"co2":400},"unknown":["noise"]}'
+
+  # Someone sits down in a dark room: the study lamp turns on by itself.
   - set-control:
       part-id: ldr
       control: lux
@@ -27,4 +21,20 @@ steps:
       part-id: pir
       control: motion
       value: 1
-  - wait-serial: '{"temp":31.0,"hum":72.0,"lux":50,"ldr_do":1,"co2":1200,"mq_do":0,"pir":1}'
+  - wait-serial: '"lamp":"on","lamp_mode":"auto"'
+
+  # Stale air and new climate readings.
+  - set-control:
+      part-id: mq135
+      control: ppm
+      value: 1500
+  - set-control:
+      part-id: dht1
+      control: temperature
+      value: 31
+  - wait-serial: '"temperature":31,"humidity":50,"lighting":50,"co2":1500,"air_quality":"stale"'
+
+  # Command from the desktop app: lamp off.
+  - write-serial: '{"lamp":"off"}'
+  - write-serial: [10]
+  - wait-serial: '"lamp":"off","lamp_mode":"off"'

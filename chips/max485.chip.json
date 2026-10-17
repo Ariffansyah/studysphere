@@ -1,0 +1,5 @@
+{
+  "name": "MAX485 TTL to RS485",
+  "author": "wirelab",
+  "pins": ["RO", "RE", "DE", "DI", "VCC", "B", "A", "GND"]
+}

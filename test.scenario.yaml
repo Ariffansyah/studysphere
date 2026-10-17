@@ -1,0 +1,30 @@
+# End-to-end check of firmware + custom chips:
+#   wokwi-cli --scenario test.scenario.yaml --timeout 20000 .
+name: WireLab sensors
+version: 1
+author: wirelab
+
+steps:
+  - wait-serial: '{"temp":25.0,"hum":50.0,"lux":500,"ldr_do":0,"co2":400,"mq_do":1,"pir":0}'
+
+  - set-control:
+      part-id: md02
+      control: temperature
+      value: -12.3
+  - set-control:
+      part-id: md02
+      control: humidity
+      value: 87.5
+  - set-control:
+      part-id: mq135
+      control: ppm
+      value: 1200
+  - set-control:
+      part-id: ldr
+      control: lux
+      value: 50
+  - set-control:
+      part-id: pir
+      control: motion
+      value: 1
+  - wait-serial: '{"temp":-12.3,"hum":87.5,"lux":50,"ldr_do":1,"co2":1200,"mq_do":0,"pir":1}'

@@ -1,0 +1,20 @@
+[wokwi]
+version = 1
+firmware = 'firmware/build/firmware.ino.merged.bin'
+elf = 'firmware/build/firmware.ino.elf'
+
+[[chip]]
+name = 'max485'
+binary = 'chips/max485.chip.wasm'
+
+[[chip]]
+name = 'xy-md02'
+binary = 'chips/xy-md02.chip.wasm'
+
+[[chip]]
+name = 'mq135'
+binary = 'chips/mq135.chip.wasm'
+
+[[chip]]
+name = 'hc-sr501'
+binary = 'chips/hc-sr501.chip.wasm'

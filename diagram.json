@@ -40,19 +40,11 @@
       }
     },
     {
-      "type": "chip-max485",
-      "id": "rs485",
-      "top": 87,
-      "left": 232,
-      "attrs": {}
-    },
-    {
-      "type": "chip-xy-md02",
-      "id": "md02",
-      "top": -3,
-      "left": 446,
+      "type": "chip-dht11",
+      "id": "dht1",
+      "top": -40,
+      "left": 260,
       "attrs": {
-        "address": "1",
         "temperature": "25",
         "humidity": "50"
       }
@@ -191,79 +183,21 @@
       ]
     ],
     [
-      "rs485:VCC",
-      "esp:5V",
+      "dht1:VCC",
+      "esp:3V3",
       "red",
       []
     ],
     [
-      "rs485:GND",
+      "dht1:GND",
       "esp:GND.2",
       "black",
-      [
-        "h2",
-        "v-163"
-      ]
+      []
     ],
     [
-      "rs485:RO",
-      "esp:16",
+      "dht1:DATA",
+      "esp:4",
       "green",
-      []
-    ],
-    [
-      "rs485:DI",
-      "esp:17",
-      "blue",
-      []
-    ],
-    [
-      "rs485:DE",
-      "esp:4",
-      "purple",
-      []
-    ],
-    [
-      "rs485:RE",
-      "esp:4",
-      "purple",
-      []
-    ],
-    [
-      "md02:VCC",
-      "esp:5V",
-      "red",
-      [
-        "v186",
-        "h-205",
-        "v-19",
-        "h-139",
-        "v-3",
-        "h-67",
-        "v-66"
-      ]
-    ],
-    [
-      "md02:GND",
-      "esp:GND.2",
-      "black",
-      [
-        "h-86",
-        "v-236",
-        "h-202",
-        "v161"
-      ]
-    ],
-    [
-      "md02:A",
-      "rs485:A",
-      "yellow",
-      []
-    ],
-    [
-      "md02:B",
-      "rs485:B",
-      "white",
       []
     ]
   ],

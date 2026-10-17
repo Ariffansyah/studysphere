@@ -4,12 +4,8 @@ firmware = 'firmware/build/firmware.ino.merged.bin'
 elf = 'firmware/build/firmware.ino.elf'
 
 [[chip]]
-name = 'max485'
-binary = 'chips/max485.chip.wasm'
-
-[[chip]]
-name = 'xy-md02'
-binary = 'chips/xy-md02.chip.wasm'
+name = 'dht11'
+binary = 'chips/dht11.chip.wasm'
 
 [[chip]]
 name = 'mq135'

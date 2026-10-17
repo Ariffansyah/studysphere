@@ -1,9 +1,0 @@
-{
-  "name": "XY-MD02 (Modbus RTU)",
-  "author": "wirelab",
-  "pins": ["VCC", "GND", "A", "B"],
-  "controls": [
-    { "id": "temperature", "label": "Temperature (°C)", "type": "range", "min": -40, "max": 80, "step": 0.1 },
-    { "id": "humidity", "label": "Humidity (%RH)", "type": "range", "min": 0, "max": 100, "step": 0.1 }
-  ]
-}

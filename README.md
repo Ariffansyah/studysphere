@@ -1,6 +1,6 @@
 # StudySphere: Smart Study Room (UTS/UAS IoT)
 
-Node IoT berbasis ESP32 untuk ruang belajar pintar. Node membaca suhu, kelembapan, cahaya, kualitas udara dan kehadiran orang, menyalakan lampu belajar secara otomatis, menampilkan status di LCD, dan berkomunikasi dengan aplikasi desktop lewat **MQTT**. Aplikasi desktop (dengan LLM lokal) dikerjakan terpisah; README ini menjelaskan sisi IoT dan kontrak MQTT yang akan dipakai aplikasi itu.
+Node IoT berbasis ESP32 untuk ruang belajar pintar. Node membaca suhu, kelembapan, cahaya, kualitas udara dan kehadiran orang, menyalakan lampu belajar secara otomatis, menampilkan status di LCD, dan berkomunikasi dengan aplikasi desktop lewat **MQTT**. Aplikasi desktop (Tauri, Windows dan Linux) ada di `desktop/` dan sekaligus menjadi broker MQTT di laptop, jadi sistemnya berdiri sendiri tanpa internet. LLM lokal dikerjakan terpisah dan memakai kontrak MQTT di bawah.
 
 ## Komponen dan wiring
 
@@ -32,7 +32,7 @@ Untuk perangkat asli:
 
 ## MQTT
 
-Broker bawaan: `broker.hivemq.com:1883` (broker publik untuk uji coba). Semua topik diawali `studysphere/room-01/` (`TOPIC_ROOT` dan `DEVICE_ID` di `firmware/config.h`).
+Broker: aplikasi desktop di laptop, port 1883 (lihat [Aplikasi desktop](#aplikasi-desktop)). Semua topik diawali `studysphere/room-01/` (`TOPIC_ROOT` dan `DEVICE_ID` di `firmware/config.h`).
 
 | Topik | Arah | Isi |
 |---|---|---|
@@ -84,24 +84,55 @@ Setelah command lampu, node langsung mengirim telemetry baru sebagai konfirmasi.
 
 Nama lain dikembalikan di `unknown`. Request dan command yang sama juga bisa dikirim lewat Serial, satu baris JSON per perintah.
 
-Broker publik bisa dibaca dan ditulisi siapa saja. Untuk presentasi, ganti `DEVICE_ID` dengan sesuatu yang unik (misalnya NIM), atau pakai broker sendiri seperti di bawah.
-
 ## Konfigurasi
 
-Semua pengaturan jaringan ada di `firmware/config.h`: SSID dan password WiFi, host dan port broker, user dan password MQTT, `TOPIC_ROOT` dan `DEVICE_ID`. Nilai bawaannya untuk simulator (WiFi `Wokwi-GUEST`).
+Semua pengaturan jaringan ada di `firmware/config.h`: SSID dan password WiFi, host dan port broker, user dan password MQTT, `TOPIC_ROOT` dan `DEVICE_ID`. `MQTT_HOST` otomatis `127.0.0.1` di simulator lokal WireLab (makro `WIRELAB_SIM`). Untuk board asli, isi dengan IP laptop yang ditampilkan aplikasi desktop.
+
+## Aplikasi desktop
+
+Aplikasi di `desktop/` adalah *island*: pulau hitam kecil yang menggantung di tengah atas layar, dengan maskot burung hantu yang menjaga ruang belajar. Wajah dan kalimat burung hantu mengikuti keadaan ruangan: tidur saat ruangan kosong, senang saat ada yang belajar, pusing saat udara pengap, dan kaget saat node tidak mengirim data.
+
+| Yang dilakukan | Yang terjadi |
+|---|---|
+| Arahkan mouse ke garis kecil di tengah atas layar | Island muncul satu baris: suhu, kelembapan, CO2 dan lampu |
+| Klik island | Island terbuka: semua data, mode lampu (auto, on, off) dan pesan untuk LCD |
+| `Esc`, atau mouse keluar | Island menutup lagi (8 detik setelah terbuka, 20 detik setelah satu baris) |
+| Udara pengap atau node putus | Island terbuka sendiri |
+| Tombol **Quit** di island yang terbuka | Menutup aplikasi |
+
+Saat dibuka, aplikasi menjalankan broker MQTT sendiri di port 1883 pada semua interface laptop, jadi tidak perlu Mosquitto atau internet. Kalau port 1883 sudah dipakai broker lain (misalnya Mosquitto), aplikasi memakai broker itu. Aplikasi mengikuti `DEVICE_ID` apa pun yang mengirim telemetry.
+
+Di Linux, island memakai layer-shell supaya tetap di atas layar (KDE, Hyprland, Sway, COSMIC). Pasang `gtk-layer-shell` (Arch) atau `libgtk-layer-shell0` (Debian/Ubuntu). Tanpa itu, atau di GNOME, island menjadi jendela biasa yang selalu di atas, dan posisinya ditentukan oleh desktop.
+
+Syarat untuk build: [Rust](https://rustup.rs), Node.js, dan prasyarat Tauri untuk sistemnya ([daftar lengkap](https://v2.tauri.app/start/prerequisites/)): di Linux `webkit2gtk-4.1`, di Windows Microsoft C++ Build Tools (WebView2 sudah ada di Windows 10 dan 11).
+
+```sh
+cd desktop
+npm install
+npm run tauri dev     # jalankan
+npm run tauri build   # installer: .msi dan .exe di Windows, .deb, .rpm dan .AppImage di Linux
+```
+
+Installer Windows harus di-build di Windows (Tauri tidak bisa cross-compile dari Linux). Hasilnya ada di `desktop/src-tauri/target/release/bundle/`.
+
+Supaya ESP32 asli bisa tersambung ke laptop:
+
+- ESP32 dan laptop harus di WiFi yang sama. WiFi kampus sering memblokir koneksi antar perangkat; kalau begitu, pakai hotspot HP atau hotspot laptop.
+- Windows menanyakan izin firewall saat aplikasi pertama kali dibuka. Izinkan untuk jaringan **Private**, lalu pastikan WiFi-nya diset sebagai Private. Di Linux dengan ufw: `sudo ufw allow 1883/tcp`.
+- Broker tidak memakai password, jadi siapa pun di WiFi yang sama bisa membaca dan mengirim command. Untuk presentasi di jaringan bersama, pakai hotspot sendiri.
 
 ## Menjalankan
 
 ### Di simulator WireLab (lokal, tanpa kuota)
 
-Buka folder ini di WireLab lalu tekan **Run**. Proyek ini memakai **simulator lokal** WireLab (`"engine": "local"` di `wirelab.json`):
+Buka aplikasi desktop, lalu buka folder ini di WireLab dan tekan **Run**. Proyek ini memakai **simulator lokal** WireLab (`"engine": "local"` di `wirelab.json`):
 
 - Firmware di-compile untuk PC dan berjalan di PC, jadi tidak memakai server atau kuota Wokwi.
-- WiFi memakai koneksi internet PC, jadi MQTT tersambung ke broker sungguhan dan aplikasi desktop bisa langsung menerima datanya.
+- WiFi memakai jaringan PC, dan node tersambung ke broker aplikasi desktop di `127.0.0.1:1883`.
 - Sensor diatur dengan mengklik part saat simulasi berjalan: slider cahaya (LDR), CO2 (MQ-135), suhu dan kelembapan (DHT11), serta tombol gerakan (PIR). LED dan LCD ikut menampilkan hasilnya.
 - Syaratnya: compiler C++ (`g++` atau `clang++`) dan arduino-cli.
 
-Simulator lokal mensimulasikan perilaku, bukan chip-nya: timing sinyal DHT11 dan I2C LCD tidak disimulasikan (library-nya diganti versi tiruan yang memakai nilai dari WireLab). Untuk menguji di mesin Wokwi, ganti simulator di **Settings** (memakai kuota CI: akun Free mendapat 50 menit per 30 hari), atau jalankan:
+Simulator lokal mensimulasikan perilaku, bukan chip-nya: timing sinyal DHT11 dan I2C LCD tidak disimulasikan (library-nya diganti versi tiruan yang memakai nilai dari WireLab). Untuk menguji di mesin Wokwi, ganti simulator di **Settings** (memakai kuota CI: akun Free mendapat 50 menit per 30 hari), atau jalankan perintah di bawah. Mesin Wokwi berjalan di server Wokwi, jadi tidak bisa menjangkau broker di laptop; tes ini hanya memakai Serial.
 
 ```sh
 arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir firmware/build firmware
@@ -114,40 +145,30 @@ wokwi-cli --scenario test.scenario.yaml --timeout 60000 .
    ```sh
    arduino-cli lib install "DHT sensor library" "Adafruit Unified Sensor" "LiquidCrystal I2C" PubSubClient ArduinoJson
    ```
-2. Isi WiFi kamu di `firmware/config.h`, dan ubah `volts()` untuk board asli (lihat bagian wiring).
+2. Isi WiFi kamu dan `MQTT_HOST` (IP laptop, ditampilkan aplikasi desktop) di `firmware/config.h`, dan ubah `volts()` untuk board asli (lihat bagian wiring).
 3. Compile, upload, lalu lihat serial monitor (ganti `/dev/ttyUSB0` sesuai port ESP32):
    ```sh
    arduino-cli compile --fqbn esp32:esp32:esp32 firmware
    arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 firmware
    arduino-cli monitor -p /dev/ttyUSB0 -c baudrate=115200
    ```
-
-**Broker sendiri di laptop (Mosquitto).** Lebih aman dan tidak bergantung internet.
-
-1. Pasang Mosquitto (`sudo pacman -S mosquitto`, atau `sudo apt install mosquitto mosquitto-clients`).
-2. Tambahkan ke `/etc/mosquitto/mosquitto.conf`:
-   ```text
-   listener 1883 0.0.0.0
-   allow_anonymous true
-   ```
-3. Jalankan `sudo systemctl restart mosquitto`.
-4. Isi `MQTT_HOST` dengan IP laptop di jaringan WiFi yang sama.
+4. Buka aplikasi desktop. Serial monitor menampilkan `MQTT connected` setelah node tersambung.
 
 ## Mengetes MQTT tanpa aplikasi desktop
 
-Pakai [MQTT Explorer](https://mqtt-explorer.com/) (GUI), atau `mosquitto_sub` / `mosquitto_pub` dari paket mosquitto:
+Selama aplikasi desktop terbuka, broker-nya bisa dipakai alat lain. Pakai [MQTT Explorer](https://mqtt-explorer.com/) (GUI), atau `mosquitto_sub` / `mosquitto_pub` dari paket mosquitto:
 
 ```sh
 # lihat semua pesan dari node
-mosquitto_sub -h broker.hivemq.com -t 'studysphere/room-01/#' -v
+mosquitto_sub -h localhost -t 'studysphere/room-01/#' -v
 
 # minta data seperti yang akan dilakukan LLM
-mosquitto_pub -h broker.hivemq.com -t studysphere/room-01/request \
+mosquitto_pub -h localhost -t studysphere/room-01/request \
   -m '{"task":"comfort_check","required_information":["temperature","humidity","co2"]}'
 
 # atur lampu dan LCD
-mosquitto_pub -h broker.hivemq.com -t studysphere/room-01/command -m '{"lamp":"on"}'
-mosquitto_pub -h broker.hivemq.com -t studysphere/room-01/command -m '{"lcd":"Waktunya istirahat"}'
+mosquitto_pub -h localhost -t studysphere/room-01/command -m '{"lamp":"on"}'
+mosquitto_pub -h localhost -t studysphere/room-01/command -m '{"lcd":"Waktunya istirahat"}'
 ```
 
 ## Struktur folder
@@ -155,6 +176,7 @@ mosquitto_pub -h broker.hivemq.com -t studysphere/room-01/command -m '{"lcd":"Wa
 ```text
 firmware/firmware.ino   program ESP32
 firmware/config.h       WiFi, broker MQTT, topik
+desktop/                aplikasi desktop dan broker MQTT (Tauri)
 diagram.json            rangkaian (WireLab / Wokwi)
 wokwi.toml              lokasi firmware dan custom chip untuk simulator
 chips/                  DHT11, MQ-135 dan HC-SR501 untuk simulator

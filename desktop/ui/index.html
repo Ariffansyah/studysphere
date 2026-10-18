@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StudySphere</title>
+<style>
+  /* The island is always dark, like a notch hanging from the top of the screen. */
+  :root {
+    color-scheme: dark;
+    --island: #0b0c0e; --card: #17181c; --ink: #f5f6f8; --dim: #9398a1; --hairline: rgba(255, 255, 255, .08);
+    --owl: #f2b84b; --owl-dark: #d9952f; --face: #fbf3e2; --face-ink: #1d2a33;
+    --warn: #ff8d97; --ok: #34d399; --focus: #7cb8ec;
+    --ear: 10px;
+    --ease: cubic-bezier(.2, .9, .3, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: transparent; overflow: hidden; }
+  body {
+    font: 13px/1.4 system-ui, "Segoe UI", Ubuntu, sans-serif; color: var(--ink);
+    -webkit-font-smoothing: antialiased; user-select: none; cursor: default;
+  }
+
+  #island {
+    position: relative; margin: 0 auto; width: 140px; height: 6px;
+    background: var(--island); border-radius: 0 0 6px 6px;
+    transition: width .3s var(--ease), height .3s var(--ease), border-radius .3s var(--ease);
+  }
+  /* The inverted corners that join the island to the screen edge. */
+  #island::before, #island::after { content: ""; position: absolute; top: 0; width: var(--ear); height: var(--ear); }
+  #island::before { left: calc(-1 * var(--ear)); background: radial-gradient(circle at 0 100%, transparent calc(var(--ear) - .5px), var(--island) var(--ear)); }
+  #island::after { right: calc(-1 * var(--ear)); background: radial-gradient(circle at 100% 100%, transparent calc(var(--ear) - .5px), var(--island) var(--ear)); }
+  #island[data-state="hidden"] { --ear: 4px; }
+  #island[data-state="compact"] { border-radius: 0 0 18px 18px; }
+  #island[data-state="expanded"] { border-radius: 0 0 24px 24px; }
+  #clip { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; }
+
+  .view {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    opacity: 0; visibility: hidden; transition: opacity .15s, visibility 0s .15s;
+  }
+  #island[data-state="compact"] #compact, #island[data-state="expanded"] #expanded {
+    opacity: 1; visibility: visible; transition: opacity .2s .1s, visibility 0s;
+  }
+
+  #compact { width: 300px; height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 18px 0 12px; cursor: pointer; }
+  #compact .owl { width: 30px; height: 30px; margin-top: 2px; flex: none; }
+  #compact-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  .lamp { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--dim); flex: none; }
+  .lamp-on .lamp { background: var(--owl); border-color: var(--owl); }
+
+  #expanded { width: 560px; padding: 14px 22px 20px; }
+  .head { display: flex; align-items: center; gap: 14px; }
+  .head .owl { width: 64px; height: 64px; flex: none; }
+  .speech { flex: 1; }
+  #say { font-size: 15px; font-weight: 500; }
+  .warn { color: var(--warn); }
+  .dim, .hint { color: var(--dim); }
+  .hint { font-size: 12px; }
+  #quit { align-self: flex-start; color: var(--dim); padding: 4px 8px; }
+
+  .card { background: var(--card); border-radius: 14px; padding: 12px 14px; margin-top: 12px; }
+  .readings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .readings dt { color: var(--dim); font-size: 12px; }
+  .readings dd { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .readings dd small { font-size: 12px; font-weight: 400; color: var(--dim); }
+  .stale .readings { opacity: .5; }
+
+  .controls { display: flex; gap: 10px; align-items: center; }
+  .modes { display: inline-flex; border: 1px solid var(--hairline); border-radius: 10px; overflow: hidden; flex: none; }
+  .modes button + button { border-left: 1px solid var(--hairline); }
+  .modes button[aria-pressed="true"] { background: #2a2c31; }
+  .modes button[data-mode="on"][aria-pressed="true"] { background: var(--owl); color: var(--face-ink); }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 0; background: transparent; padding: 6px 13px; border-radius: 10px; }
+  .modes button { border-radius: 0; }
+  button:hover:not(:disabled) { background-color: rgba(255, 255, 255, .07); }
+  button:disabled { cursor: default; opacity: .45; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  form { flex: 1; display: flex; gap: 8px; min-width: 0; }
+  input { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid var(--hairline); border-radius: 10px; background: var(--island); user-select: text; }
+  input::placeholder { color: #7c818a; }
+  .send { background: #2a2c31; }
+  #lcd-hint { margin-top: 8px; }
+
+  #setup ol { padding-left: 18px; }
+  #setup li + li { margin-top: 6px; }
+  code { font: 12px ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace; background: var(--island); border-radius: 4px; padding: 1px 5px; }
+  #addresses { margin-top: 10px; }
+
+  /* The owl: a kaomoji face on a round body. Its eyes follow the mouse, it blinks, and it
+     hops when its mood changes. */
+  .owl { overflow: visible; }
+  .owl .eyes { transform-box: fill-box; transform-origin: center; transition: transform 70ms; }
+  .owl.blink .eyes { transform: scaleY(.15); }
+  .owl.hop { animation: hop .34s var(--ease); }
+  @keyframes hop { 40% { transform: translateY(-3px); } }
+  .owl text { font: 700 7px ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", monospace; fill: var(--face-ink); text-anchor: middle; dominant-baseline: central; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #island, .view { transition: none !important; }
+    .owl.hop { animation: none; }
+  }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<template id="owl">
+  <svg class="owl" viewBox="0 0 40 40" aria-hidden="true">
+    <path d="M9 14 7.5 4.5 15 9.5Q20 8 25 9.5L32.5 4.5 31 14Q35 21.5 32.5 29 29 37 20 37 11 37 7.5 29 5 21.5 9 14Z" fill="var(--owl)"/>
+    <path d="M8.6 21Q5.8 27.5 10.2 33.5 11 27 8.6 21ZM31.4 21Q34.2 27.5 29.8 33.5 29 27 31.4 21Z" fill="var(--owl-dark)"/>
+    <path d="M16 29.5l2 1.5 2-1.5 2 1.5 2-1.5" fill="none" stroke="var(--owl-dark)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M16.5 37v1.6M18.5 37v1.6M21.5 37v1.6M23.5 37v1.6" stroke="var(--owl-dark)" stroke-width="1.1" stroke-linecap="round"/>
+    <g class="face">
+      <ellipse cx="20" cy="19" rx="11" ry="7.6" fill="var(--face)"/>
+      <g class="eyes"><text class="eye-l" x="15" y="18.6">•</text><text class="eye-r" x="25" y="18.6">•</text></g>
+      <path d="M18.7 21.2h2.6L20 23.4Z" fill="var(--owl-dark)"/>
+    </g>
+  </svg>
+</template>
+
+<div id="island" data-state="hidden">
+  <div id="clip">
+    <div class="view" id="compact" title="Open StudySphere">
+      <span class="owl-slot"></span>
+      <span id="compact-text"></span>
+      <span class="lamp" title="Study lamp"></span>
+    </div>
+
+    <div class="view" id="expanded">
+      <div class="head">
+        <span class="owl-slot" id="big-owl"></span>
+        <div class="speech">
+          <p id="say" role="status"></p>
+          <p id="status" class="dim"></p>
+        </div>
+        <button id="quit" title="Quit StudySphere">Quit</button>
+      </div>
+
+      <div class="card" id="setup">
+        <ol>
+          <li><strong>WireLab:</strong> open the utsuas project and press Run. In the simulator, <code>config.h</code> already points the node at <code>127.0.0.1</code>.</li>
+          <li><strong>Real ESP32:</strong> on the same WiFi as this laptop, set <code>MQTT_HOST</code> in <code>config.h</code> to this laptop's address there, then upload.</li>
+        </ol>
+        <p class="hint" id="addresses"></p>
+      </div>
+
+      <div id="room" hidden>
+        <dl class="card readings">
+          <div><dt>Temperature</dt><dd id="temperature">--</dd></div>
+          <div><dt>Humidity</dt><dd id="humidity">--</dd></div>
+          <div><dt>Light</dt><dd id="lighting">--</dd></div>
+          <div><dt>CO2</dt><dd id="co2">--</dd></div>
+        </dl>
+        <div class="card">
+          <div class="controls">
+            <div class="modes" role="group" aria-label="Study lamp">
+              <button data-mode="auto" aria-pressed="false" title="On while someone is in the room and it is darker than 150 lux">Auto</button>
+              <button data-mode="on" aria-pressed="false">On</button>
+              <button data-mode="off" aria-pressed="false">Off</button>
+            </div>
+            <form id="lcd-form">
+              <input id="lcd-text" maxlength="32" autocomplete="off" aria-label="Message for the LCD" placeholder="Message for the LCD">
+              <button class="send" type="submit">Send</button>
+            </form>
+          </div>
+          <p class="hint" id="lcd-hint">Lamp mode, and up to 32 characters on the LCD for 30 seconds.</p>
+        </div>
+        <p class="hint" id="broker" style="margin-top: 10px"></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const { listen } = window.__TAURI__.event;
+  const $ = (id) => document.getElementById(id);
+  const island = $('island'), expanded = $('expanded');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const SILENT_MS = 15000;  // the node sends telemetry every 5 s
+  const EAR = 10;           // the inverted corners stick out this far on each side
+  const SIZES = { hidden: [140, 6], compact: [300, 36] };  // expanded: 560 wide, as tall as its content
+  const COLLAPSE_MS = { expanded: 8000, compact: 20000 };  // after the mouse leaves
+
+  let state = 'hidden', hovering = false, collapseTimer, shrinkTimer, win = { w: 0, h: 0 };
+  let base = null, room = '', lastSeen = 0, t = null, silentShown = false;
+  let info = { connected: false, ownBroker: true, addresses: [], port: 1883 };
+
+  // ── The island: hidden (a sliver at the top edge), compact (one line), expanded ────────────
+
+  function shape() {
+    const [w, h] = state === 'expanded' ? [560, Math.ceil(expanded.offsetHeight)] : SIZES[state];
+    const W = w + 2 * EAR;
+    // Grow the window first and shrink it after the animation, so the island is never cut off.
+    win = { w: Math.max(win.w, W), h: Math.max(win.h, h) };
+    invoke('resize', win);
+    island.style.width = w + 'px';
+    island.style.height = h + 'px';
+    clearTimeout(shrinkTimer);
+    shrinkTimer = setTimeout(() => { win = { w: W, h }; invoke('resize', win); }, reduced ? 0 : 320);
+  }
+
+  function go(next) {
+    if (next !== state) {
+      state = next;
+      island.dataset.state = next;
+      shape();
+    }
+    arm();
+  }
+
+  // Stays open while the mouse is on it or something in it has keyboard focus.
+  const held = () => hovering || !!island.querySelector(':focus-visible');
+
+  function arm() {
+    clearTimeout(collapseTimer);
+    if (state === 'hidden' || held()) return;
+    collapseTimer = setTimeout(() => go(state === 'expanded' ? 'compact' : 'hidden'), COLLAPSE_MS[state]);
+  }
+
+  const reveal = () => { if (state === 'hidden') go('compact'); };
+  const attention = () => go('expanded');
+
+  document.documentElement.addEventListener('mouseenter', () => { hovering = true; clearTimeout(collapseTimer); reveal(); });
+  const pointerLeft = () => { hovering = false; look(null); arm(); };
+  document.documentElement.addEventListener('mouseleave', pointerLeft);
+  $('compact').addEventListener('click', () => go('expanded'));
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    document.activeElement?.blur();
+    go('compact');
+  });
+  // Clicking another window leaves nothing focused here, so the island can tuck itself away.
+  window.addEventListener('blur', () => { document.activeElement?.blur(); arm(); });
+  island.addEventListener('focusout', () => setTimeout(arm));
+  new ResizeObserver(() => { if (state === 'expanded') shape(); }).observe(expanded);
+
+  // ── The owl ────────────────────────────────────────────────────────────────────────────────
+
+  for (const slot of document.querySelectorAll('.owl-slot')) slot.replaceWith($('owl').content.cloneNode(true));
+  const owls = [...document.querySelectorAll('.owl')];
+  const bigOwl = owls[1];
+
+  const FACES = {
+    normal: ['•', '•'], happy: ['^', '^'], sleepy: ['-', '-'], dizzy: ['@', '@'],
+    wide: ['O', 'O'], love: ['♥', '♥'], wink: ['^', '~'],
+  };
+  const SHUT = new Set(['happy', 'sleepy', 'wink']);  // a blink changes nothing
+  let face = null, override = null, overrideTimer;
+
+  function setFace(name) {
+    if (name === face) return;
+    const hop = face !== null && !reduced;
+    face = name;
+    for (const owl of owls) {
+      owl.querySelector('.eye-l').textContent = FACES[name][0];
+      owl.querySelector('.eye-r').textContent = FACES[name][1];
+      if (hop) {
+        owl.classList.remove('hop');
+        void owl.getBBox();
+        owl.classList.add('hop');
+      }
+    }
+  }
+
+  // A face for a moment (ms), or until cleared with null.
+  function flash(name, ms) {
+    override = name;
+    clearTimeout(overrideTimer);
+    if (ms) overrideTimer = setTimeout(() => { override = null; render(); }, ms);
+    render();
+  }
+
+  function blink() {
+    if (!reduced && !SHUT.has(face)) {
+      for (const owl of owls) owl.classList.add('blink');
+      setTimeout(() => owls.forEach((o) => o.classList.remove('blink')), 130);
+    }
+    setTimeout(blink, 2500 + Math.random() * 4000);
+  }
+
+  // The face turns toward the mouse while it is over the island.
+  function look(e) {
+    for (const owl of owls) {
+      const r = owl.getBoundingClientRect();
+      const dx = e ? Math.tanh((e.clientX - r.left - r.width / 2) / 120) * 1.6 : 0;
+      const dy = e ? Math.tanh((e.clientY - r.top - r.height / 2) / 80) * 1.2 : 0;
+      owl.querySelector('.face').setAttribute('transform', `translate(${dx.toFixed(2)} ${dy.toFixed(2)})`);
+    }
+  }
+  document.addEventListener('mousemove', look);
+  bigOwl.addEventListener('mouseenter', () => flash('love'));
+  bigOwl.addEventListener('mouseleave', () => flash(null));
+
+  // ── The room ───────────────────────────────────────────────────────────────────────────────
+
+  const fmt = (n, digits = 0) => n == null ? '--' : n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+  function duration(s) {
+    const m = Math.floor(s / 60);
+    return m < 1 ? 'under a minute' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+  }
+
+  // What the owl thinks of the room: its face, what it says, and the compact line.
+  function mood() {
+    if (!lastSeen) return { face: 'normal', say: "Hi! I'm waiting for the room node.", line: 'Waiting for the room node' };
+    const quiet = Date.now() - lastSeen;
+    if (quiet > SILENT_MS) {
+      return { face: 'wide', warn: true, say: `I haven't heard from ${room} for ${Math.round(quiet / 1000)} s. Is the node still on?`, line: 'Room node offline' };
+    }
+    if (t.air_quality === 'stale') {
+      return { face: 'dizzy', warn: true, say: `The air is stale (${fmt(t.co2)} ppm). Open a window?`, line: `CO2 ${fmt(t.co2)} ppm · open a window` };
+    }
+    const line = `${fmt(t.temperature, 1)}°C · ${fmt(t.humidity)}% · ${fmt(t.co2)} ppm`;
+    if (t.occupancy) return { face: 'happy', say: `You've been studying for ${duration(t.session_duration || 0)}. Keep going!`, line };
+    return { face: 'sleepy', say: "The room is empty. I'll keep watch.", line };
+  }
+
+  function setText(id, text) {
+    if ($(id).textContent !== text) $(id).textContent = text;
+  }
+
+  function reading(id, value, unit) {
+    const el = $(id);
+    el.textContent = value;
+    if (value !== '--') el.append(' ', Object.assign(document.createElement('small'), { textContent: unit }));
+  }
+
+  function brokerText() {
+    const where = info.ownBroker ? 'built in to this app' : 'already running on this laptop';
+    return info.connected
+      ? `MQTT broker on port ${info.port}, ${where}.`
+      : `Can't reach the MQTT broker on port ${info.port} (${where}). Close other programs using that port, or restart the app.`;
+  }
+
+  function render() {
+    const m = mood(), seen = lastSeen > 0, silent = seen && Date.now() - lastSeen > SILENT_MS;
+    setFace(override || m.face);
+    setText('say', m.say);
+    $('say').classList.toggle('warn', !!m.warn);
+    setText('compact-text', m.line);
+    $('compact-text').classList.toggle('warn', !!m.warn);
+    setText('status', seen ? `${room} · ${silent ? 'offline' : 'online'}` : brokerText());
+    const ips = info.addresses.map((a) => `${a.ip} (${a.name})`).join(', ');
+    setText('addresses', ips ? `This laptop: ${ips}.` : 'This laptop has no network address right now.');
+    setText('broker', brokerText() + (ips ? ` This laptop: ${ips}.` : ''));
+    $('setup').hidden = seen;
+    $('room').hidden = !seen;
+    $('room').classList.toggle('stale', silent);
+    $('compact').classList.toggle('lamp-on', t?.lamp === 'on');
+    for (const b of document.querySelectorAll('[data-mode], .send')) b.disabled = !seen || silent;
+  }
+
+  function showReadings() {
+    reading('temperature', fmt(t.temperature, 1), '°C');
+    reading('humidity', fmt(t.humidity), '%');
+    reading('lighting', fmt(t.lighting), 'lux');
+    reading('co2', fmt(t.co2), 'ppm');
+    for (const b of document.querySelectorAll('[data-mode]')) b.setAttribute('aria-pressed', b.dataset.mode === t.lamp_mode);
+  }
+
+  function onTelemetry(topic, json) {
+    let next;
+    try { next = JSON.parse(json); } catch { return; }
+    const prev = t;
+    base = topic.slice(0, -'telemetry'.length);  // TOPIC_ROOT/DEVICE_ID/
+    room = topic.split('/')[1];
+    lastSeen = Date.now();
+    silentShown = false;
+    t = next;
+    showReadings();
+    render();
+    // Stale air needs doing something about: open up. Other news only peeks out.
+    if (t.air_quality === 'stale' && prev?.air_quality !== 'stale') attention();
+    else if (!prev || t.lamp !== prev.lamp || t.occupancy !== prev.occupancy) reveal();
+  }
+
+  function tick() {
+    render();
+    if (lastSeen && Date.now() - lastSeen > SILENT_MS && !silentShown) {
+      silentShown = true;
+      attention();
+    }
+  }
+
+  // ── Commands ───────────────────────────────────────────────────────────────────────────────
+
+  const send = (command) => invoke('publish', { topic: base + 'command', payload: JSON.stringify(command) });
+
+  for (const b of document.querySelectorAll('[data-mode]')) {
+    // The node confirms with fresh telemetry, which presses the button.
+    b.addEventListener('click', () => send({ lamp: b.dataset.mode }).then(() => flash('wink', 1200)));
+  }
+
+  $('lcd-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = $('lcd-text').value.trim();
+    if (!text) return;
+    try {
+      await send({ lcd: text });
+      $('lcd-text').value = '';
+      $('lcd-text').blur();  // done typing: the island may tuck away again
+      $('lcd-hint').textContent = `Sent "${text}" to the LCD.`;
+      flash('wink', 1200);
+    } catch (err) {
+      $('lcd-hint').textContent = `Not sent: ${err}`;
+    }
+  });
+
+  $('quit').addEventListener('click', () => invoke('quit'));
+
+  (async () => {
+    await listen('telemetry', ({ payload: [topic, json] }) => onTelemetry(topic, json));
+    await listen('pointer-left', pointerLeft);  // Linux: WebKitGTK has no mouseleave here
+    await listen('connected', ({ payload }) => { info.connected = payload; render(); });
+    info = await invoke('info');
+    render();
+    go('expanded');  // say hello, then tuck away
+    setTimeout(blink, 2000);
+    setInterval(tick, 1000);
+  })();
+</script>
+</body>
+</html>

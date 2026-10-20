@@ -2,6 +2,10 @@
 // (desktop/), which runs on the laptop. Only the WiFi and MQTT_HOST need changing for the real board.
 #pragma once
 
+// Uncomment for an ESP32 on the StudySphere PCB (hardware/): real ADC volts, the LDR on 3V3 and
+// the MQ-135 output through a 10k/15k divider. Leave it off for the simulators.
+// #define REAL_BOARD
+
 // The simulator ignores these and uses the PC's network; the real board needs your WiFi.
 #define WIFI_SSID "Wokwi-GUEST"
 #define WIFI_PASS ""

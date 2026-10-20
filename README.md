@@ -15,12 +15,52 @@ Node IoT berbasis ESP32 untuk ruang belajar pintar. Node membaca suhu, kelembapa
 
 Semua GND disambung ke GND ESP32. Rangkaiannya ada di `diagram.json` dan bisa dibuka di WireLab atau Wokwi.
 
-Untuk perangkat asli:
+Untuk perangkat asli, pakai PCB di `hardware/` (lihat [PCB dan daftar komponen](#pcb-dan-daftar-komponen)). Bedanya dengan rangkaian simulator:
 
-- Output analog modul 5 V bisa sampai 5 V, sedangkan pin ESP32 maksimal sekitar 3,1 V. Pakai pembagi tegangan (misalnya 10 kΩ dan 20 kΩ) atau beri daya modul dari 3V3.
-- Di simulator, ADC ESP32 membaca 0 sampai 5 V sebagai 0 sampai 4095, jadi `volts()` di firmware memakai `analogRead(pin) * 5.0 / 4095`. Di board asli, ganti dengan `analogReadMilliVolts(pin) / 1000.0` dan sesuaikan dengan pembagi tegangan.
+- Modul LDR diberi daya 3V3, jadi output AO-nya tidak pernah melewati batas ADC ESP32 (sekitar 3,1 V).
+- AO MQ-135 bisa sampai 5 V, jadi masuk ke GPIO35 lewat pembagi 10 kΩ/15 kΩ dan maksimal 3,0 V.
+- LCD tetap 5 V, tapi SDA dan SCL lewat level shifter BSS138, jadi pin ESP32 hanya melihat 3,3 V.
+- Aktifkan `#define REAL_BOARD` di `firmware/config.h`. Firmware lalu membaca tegangan asli dengan `analogReadMilliVolts()` dan menghitung LDR 3,3 V serta pembagi MQ-135. Tanpa itu, firmware memakai skala simulator: ADC ESP32 membaca 0 sampai 5 V sebagai 0 sampai 4095.
 - Konstanta kalibrasi LDR dan MQ-135 (`LDR_RL10`, `MQ_RZERO` dan seterusnya) ada di atas `firmware.ino`. `MQ_RZERO` sebaiknya dikalibrasi di udara bersih.
-- Modul DHT11 tiga pin sudah punya resistor pull-up. Untuk DHT11 empat pin tanpa modul, tambahkan 10 kΩ dari DATA ke 3V3.
+- Modul DHT11 tiga pin sudah punya resistor pull-up. PCB juga punya pull-up 10 kΩ (R1), jadi DHT11 empat pin tanpa modul juga bisa disambung lewat kabel jumper.
+
+## PCB dan daftar komponen
+
+Proyek KiCad 10 ada di `hardware/`; buka `hardware/studysphere.kicad_pro`. ERC dan DRC bersih, dan PCB sama dengan skematik (schematic parity).
+
+| File | Isi |
+|---|---|
+| `hardware/fab/skematik.pdf` | Skematik untuk laporan atau dicetak |
+| `hardware/fab/render-top.png`, `render-bottom.png` | Tampilan 3D PCB |
+| `hardware/fab/pcb-top.pdf`, `pcb-bottom.pdf` | Jalur tembaga dan silkscreen tiap sisi |
+| `hardware/fab/gerber-jlcpcb.zip` | Gerber dan file drill, siap diunggah ke JLCPCB atau PCBWay |
+| `hardware/fab/bom.csv` | Daftar komponen dari KiCad |
+
+PCB 2 layer, 102 × 62 mm, tebal 1,6 mm, dengan lubang M3 di keempat sudut. ESP32-DevKitC V4 ditancap ke dua female header 1x19 (jarak baris 25,4 mm): antena di tepi atas, USB di tepi bawah. Di bawah antena tidak ada tembaga. Kedua sisi PCB diisi GND. Jalur daya 0,6 mm, jalur sinyal 0,3 mm.
+
+**Komponen yang disolder ke PCB**
+
+| Jumlah | Komponen | Ref | Fungsi |
+|---|---|---|---|
+| 6 | Resistor 10 kΩ 1/4 W | R1, R2, R4, R5, R6, R7 | Pull-up DHT11, pembagi MQ-135 (atas), pull-up I2C |
+| 1 | Resistor 15 kΩ 1/4 W | R3 | Pembagi MQ-135 (bawah) |
+| 1 | Resistor 220 Ω 1/4 W | R8 | Arus LED, sekitar 6 mA |
+| 2 | Kapasitor keramik 100 nF (kode 104) | C2, C3 | Filter ADC LDR dan MQ-135 |
+| 1 | Kapasitor elektrolit 100 µF 16 V | C1 | Menahan lonjakan arus heater MQ-135 |
+| 2 | MOSFET N-channel BSS138 (SOT-23) | Q1, Q2 | Level shifter I2C 3,3 V ke 5 V |
+| 1 | LED kuning 5 mm | D1 | Lampu belajar |
+| 4 | Pin header male 1x3 | J1 sampai J4 | DHT11, PIR, LDR, MQ-135 |
+| 1 | Pin header male 1x4 | J5 | LCD I2C (urutan GND, VCC, SDA, SCL seperti backpack-nya) |
+| 2 | Female header 1x19 | U1 | Soket ESP32-DevKitC V4 |
+| 4 | Baut M3 dan spacer | H1 sampai H4 | Kaki PCB |
+
+**Modul dan lainnya:** ESP32-DevKitC V4 (38 pin), modul DHT11, HC-SR501, modul LDR, modul MQ-135, LCD 16x2 dengan backpack I2C PCF8574, 16 kabel jumper female-female, dan kabel micro-USB data.
+
+- R2 dan R3 sebaiknya metal film 1% supaya faktor pembagi MQ-135 tepat. Resistor lain boleh 5%.
+- Sebelum memesan, ukur jarak dua baris pin DevKit kamu: harus 25,4 mm dengan urutan pin seperti DevKitC V4 resmi (3V3, EN, VP sampai 5V di satu sisi). Beberapa klon 38 pin punya jarak atau urutan lain.
+- Urutan solder: Q1 dan Q2 dulu (SMD paling kecil), lalu resistor, kapasitor, LED, pin header, dan female header terakhir. Kaki + C1 masuk ke pad bertanda +, kaki pendek LED (katoda) ke pad kotak.
+- Di JLCPCB, unggah `gerber-jlcpcb.zip`, pilih 2 layer dan tebal 1,6 mm, pengaturan lain biarkan default. Kalau PCB diubah di KiCad, buat ulang Gerber lewat **File > Fabrication Outputs**.
+- Arus total sekitar 450 mA (ESP32 dengan WiFi, heater MQ-135 sekitar 150 mA, backlight LCD), jadi pakai port USB dan kabel yang bagus.
 
 ## Cara kerja
 
@@ -99,8 +139,45 @@ Aplikasi di `desktop/` adalah *island*: pulau hitam kecil yang menggantung di te
 | `Esc`, atau mouse keluar | Island menutup lagi (8 detik setelah terbuka, 20 detik setelah satu baris) |
 | Udara pengap atau node putus | Island terbuka sendiri |
 | Tombol **Quit** di island yang terbuka | Menutup aplikasi |
+| Shortcut keyboard, tombol mic, atau ketik di kolom obrolan | Ngobrol dengan burung hantu: tanya keadaan ruangan atau minta ia mengubah sesuatu (lihat di bawah) |
+| Udara pengap atau ruangan terlalu panas | Burung hantu langsung bicara memberi tahu, lalu mengingatkan lagi tiap 10 menit selama keadaannya belum membaik |
 
 Saat dibuka, aplikasi menjalankan broker MQTT sendiri di port 1883 pada semua interface laptop, jadi tidak perlu Mosquitto atau internet. Kalau port 1883 sudah dipakai broker lain (misalnya Mosquitto), aplikasi memakai broker itu. Aplikasi mengikuti `DEVICE_ID` apa pun yang mengirim telemetry.
+
+### Ngobrol dengan burung hantu
+
+Tekan shortcut (atau tombol mic) lalu bicara: island terbuka, burung hantu berbunyi "hoo-hoo" dan mendengarkan. Rekaman berhenti sendiri saat kamu diam, atau tekan shortcut/mic lagi untuk langsung mengirim; `Esc` membatalkan, dan menekan lagi saat burung hantu bicara membuatnya diam. Mic hanya terbuka selama ia mendengarkan. Batas suara mengikuti noise ruangan dan bisa disetel lewat `VOICE_RATIO` dan `VOICE_MIN` di `desktop/ui/index.html` (`node desktop/ears.test.js` mengecek kapan rekaman berhenti). Bisa juga mengetik di kolom obrolan.
+
+| Sistem | Shortcut |
+|---|---|
+| Windows, macOS, Linux X11 | `Ctrl+Alt+Space`, langsung dari aplikasi (kalau sudah dipakai aplikasi lain, hint di island tidak menyebutnya) |
+| Linux Wayland (Hyprland, Sway, KDE, GNOME) | Aplikasi tidak bisa memasang shortcut global sendiri di Wayland. Buat shortcut di desktop yang menjalankan `studysphere --talk`; perintah itu diteruskan ke aplikasi yang sedang jalan |
+
+Contoh Hyprland (config Lua), `SUPER + H`:
+
+```lua
+hl.bind("SUPER + H", hl.dsp.exec_cmd("studysphere --talk")) -- StudySphere: talk to the owl
+```
+
+Saat development (`npm run tauri dev`), ganti `studysphere` dengan path lengkap `desktop/src-tauri/target/debug/studysphere`. Aplikasi hanya jalan satu instance: membukanya lagi tidak membuat island kedua.
+
+Burung hantu juga bicara sendiri kalau ruangan sudah parah: udara pengap (CO2 di atas 1000 ppm, atau MQ-135 stasiun `poor`/alarm) atau suhu 32 °C ke atas (`HOT_C`). Ia memberi tahu apa yang harus dilakukan, dalam Bahasa Indonesia (atau bahasa yang terakhir kamu pakai dengannya), dan mengulang tiap 10 menit (`REMIND_MS`) selama keadaannya belum membaik. Burung hantu menjawab lewat suara dan balon kata, dalam bahasa yang kamu pakai, dan bisa menjalankan perintah ke node: lampu (auto, on, off) dan LCD untuk `firmware/`, atau kipas, ventilasi dan LCD untuk stasiun di `alatnya cu/`. Perintah dari LLM hanya diteruskan kalau nilainya sama dengan yang bisa dikirim tombol.
+
+| Bagian | Sekarang (sementara) | Diatur lewat |
+|---|---|---|
+| Speech to text | Groq `whisper-large-v3-turbo` | |
+| Otak (chat) | Groq `openai/gpt-oss-120b`, endpoint OpenAI-compatible | `STUDYSPHERE_LLM_URL`, `STUDYSPHERE_LLM_MODEL`, `STUDYSPHERE_LLM_KEY` |
+| Suara | Groq `canopylabs/orpheus-v1-english` (suara bahasa Inggris, tapi kalimat Indonesia tetap jelas) | |
+
+API key Groq dibaca dari environment shell yang menjalankan aplikasi: `GROQ_API_KEY`, atau `GROQ_API_KEY1` sampai `GROQ_API_KEY9`. Aplikasi mencoba key satu per satu sampai ada yang berhasil, jadi key yang kena rate limit dilewati. Model TTS Orpheus harus di-*accept terms*-nya dulu oleh admin org di [console Groq](https://console.groq.com/playground?model=canopylabs%2Forpheus-v1-english); tanpa itu burung hantu tetap menjawab, hanya tanpa suara. Kalau aplikasi dibuka dari menu desktop (bukan dari terminal), variabel ini harus ada di environment sesi login.
+
+Untuk pindah ke model SFT lokal di Ollama, jalankan aplikasi dengan:
+
+```sh
+STUDYSPHERE_LLM_URL=http://localhost:11434/v1 STUDYSPHERE_LLM_MODEL=nama-model-sft npm run tauri dev
+```
+
+Model menerima system prompt berisi data ruangan terbaru dan daftar perintah yang boleh dipakai, lalu harus menjawab satu objek JSON: `{"say": "...", "mood": "happy", "command": {"lamp": "on"}}` (`command` boleh `null`). Data latih SFT sebaiknya memakai format yang sama. Di Windows, Ollama perlu `OLLAMA_ORIGINS=*` supaya bisa dipanggil dari aplikasi. Whisper dan suara tetap memakai Groq sampai ada pengganti lokal.
 
 Di Linux, island memakai layer-shell supaya tetap di atas layar (KDE, Hyprland, Sway, COSMIC). Pasang `gtk-layer-shell` (Arch) atau `libgtk-layer-shell0` (Debian/Ubuntu). Tanpa itu, atau di GNOME, island menjadi jendela biasa yang selalu di atas, dan posisinya ditentukan oleh desktop.
 
@@ -145,7 +222,7 @@ wokwi-cli --scenario test.scenario.yaml --timeout 60000 .
    ```sh
    arduino-cli lib install "DHT sensor library" "Adafruit Unified Sensor" "LiquidCrystal I2C" PubSubClient ArduinoJson
    ```
-2. Isi WiFi kamu dan `MQTT_HOST` (IP laptop, ditampilkan aplikasi desktop) di `firmware/config.h`, dan ubah `volts()` untuk board asli (lihat bagian wiring).
+2. Isi WiFi kamu dan `MQTT_HOST` (IP laptop, ditampilkan aplikasi desktop) di `firmware/config.h`, dan aktifkan `#define REAL_BOARD` di file yang sama (rangkaian PCB di `hardware/`).
 3. Compile, upload, lalu lihat serial monitor (ganti `/dev/ttyUSB0` sesuai port ESP32):
    ```sh
    arduino-cli compile --fqbn esp32:esp32:esp32 firmware
@@ -177,6 +254,8 @@ mosquitto_pub -h localhost -t studysphere/room-01/command -m '{"lcd":"Waktunya i
 firmware/firmware.ino   program ESP32
 firmware/config.h       WiFi, broker MQTT, topik
 desktop/                aplikasi desktop dan broker MQTT (Tauri)
+hardware/               skematik, PCB dan library KiCad 10
+hardware/fab/           PDF skematik, BOM, Gerber, render PCB
 diagram.json            rangkaian (WireLab / Wokwi)
 wokwi.toml              lokasi firmware dan custom chip untuk simulator
 chips/                  DHT11, MQ-135 dan HC-SR501 untuk simulator

@@ -13,8 +13,8 @@
     {
       "type": "chip-hc-sr501",
       "id": "pir",
-      "top": -165,
-      "left": -212,
+      "top": -172,
+      "left": -241,
       "attrs": {
         "delayTime": "5",
         "inhibitTime": "1.2",
@@ -24,8 +24,8 @@
     {
       "type": "wokwi-photoresistor-sensor",
       "id": "ldr",
-      "top": 60,
-      "left": -330,
+      "top": 50,
+      "left": -462,
       "rotate": 180,
       "attrs": {}
     },

@@ -22,7 +22,7 @@ const float DARK_LUX = 150;               // auto lamp: on while someone is ther
 const float CO2_STALE = 1000;             // ppm; above this the room needs fresh air
 
 // Calibration knobs. The defaults match the simulator; tune them against the real modules.
-const float LDR_VCC = 5.0, LDR_GAMMA = 0.7, LDR_RL10 = 50;    // RL10: kOhm at 10 lux
+const float LDR_GAMMA = 0.7, LDR_RL10 = 50;                   // RL10: kOhm at 10 lux
 const float MQ_VCC = 5.0, MQ_RLOAD = 10.0, MQ_RZERO = 76.63;  // kOhm; RZERO from clean-air calibration
 
 DHT dht(DHT_PIN, DHT11);
@@ -37,9 +37,16 @@ bool present = false, lamp = false, wifiUp = false, mqttUp = false;
 String lampMode = "auto", message, serialLine;
 unsigned long sessionStart, lastMotion, lastRead, lastTelemetry, lastLcd, lastAttempt, messageUntil;
 
-// Wokwi's ESP32 ADC maps 0-5 V to 0-4095. On the real board use analogReadMilliVolts(pin) / 1000.0
-// and divide the 5 V module outputs down: an ESP32 pin tops out around 3.1 V.
+#ifdef REAL_BOARD
+// The StudySphere PCB (hardware/): the LDR module runs on 3V3 and the MQ-135 output reaches IO35
+// through a 10k/15k divider, so the pin sees 3/5 of it.
+const float LDR_VCC = 3.3, MQ_DIVIDER = 25.0 / 15;
+float volts(int pin) { return analogReadMilliVolts(pin) / 1000.0; }
+#else
+// Wokwi's ESP32 ADC maps 0-5 V to 0-4095, and the modules hang straight off the pins.
+const float LDR_VCC = 5.0, MQ_DIVIDER = 1;
 float volts(int pin) { return analogRead(pin) * 5.0 / 4095; }
+#endif
 
 void readSensors() {
   temperature = dht.readTemperature();  // NAN when the read fails
@@ -48,7 +55,7 @@ void readSensors() {
   float r = 10000 * v / (LDR_VCC - v);  // the LDR is the low side of a 10k divider
   lighting = pow(LDR_RL10 * 1e3 * pow(10, LDR_GAMMA) / r, 1 / LDR_GAMMA);
   if (!isfinite(lighting)) lighting = 100000;
-  v = volts(MQ_PIN);
+  v = volts(MQ_PIN) * MQ_DIVIDER;
   co2 = 116.6020682 * pow(MQ_RLOAD * (MQ_VCC - v) / v / MQ_RZERO, -2.769034857);
 }
 

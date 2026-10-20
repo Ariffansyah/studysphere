@@ -3,6 +3,8 @@
 // The app is its own MQTT broker on port 1883 of this laptop, so nothing else needs installing:
 // the node connects to 127.0.0.1 in WireLab's local simulator, or to this laptop's WiFi IP from a
 // real ESP32. If another broker (Mosquitto) already has the port, the app uses that one instead.
+// The owl talks through an OpenAI-compatible LLM (Groq for now, Ollama later) and Groq's Whisper
+// and TTS; the page calls them itself, this side only hands it the settings from the environment.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use rumqttc::{Client, Event, MqttOptions, Packet, QoS};
@@ -12,10 +14,16 @@ use std::net::{Ipv4Addr, TcpListener};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
+use tauri::webview::{PermissionKind, PermissionResponse};
 use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, State, WebviewWindow};
 
 const PORT: u16 = 1883;
 static CONNECTED: AtomicBool = AtomicBool::new(false);
+/// Starts and stops listening, like the mic button. Wayland gives no app a global shortcut (and
+/// global-hotkey is X11 only), so there a desktop shortcut runs `studysphere --talk` instead, which
+/// the single-instance plugin hands to the app that is already running.
+const SHORTCUT: &str = "Ctrl+Alt+Space";
+static SHORTCUT_TAKEN: AtomicBool = AtomicBool::new(false);
 /// The island is a layer-shell surface: the compositor keeps it at the top centre.
 #[cfg(target_os = "linux")]
 static LAYER: AtomicBool = AtomicBool::new(false);
@@ -63,8 +71,8 @@ fn start_broker() -> bool {
     true
 }
 
-/// Connects to the broker on this laptop and forwards every node's telemetry to the UI as
-/// "telemetry" events of [topic, payload]. Reconnects by itself.
+/// Connects to the broker on this laptop and forwards every node message to the UI as
+/// "message" events of [topic, payload]. Reconnects by itself.
 fn connect(app: AppHandle) -> Client {
     let mut opts = MqttOptions::new(format!("studysphere-desktop-{}", std::process::id()), "127.0.0.1", PORT);
     opts.set_keep_alive(Duration::from_secs(30));
@@ -80,12 +88,13 @@ fn connect(app: AppHandle) -> Client {
         for event in connection.iter() {
             match event {
                 Ok(Event::Incoming(Packet::ConnAck(_))) => {
-                    // Topics are TOPIC_ROOT/DEVICE_ID/telemetry (firmware/config.h).
-                    let _ = subscriber.try_subscribe("+/+/telemetry", QoS::AtMostOnce);
+                    // Topics are TOPIC_ROOT/DEVICE_ID/<kind>: telemetry from firmware/, state and
+                    // resp from the station sketch in "alatnya cu/". The page picks what it reads.
+                    let _ = subscriber.try_subscribe("+/+/+", QoS::AtMostOnce);
                     set_connected(true);
                 }
                 Ok(Event::Incoming(Packet::Publish(p))) => {
-                    let _ = app.emit("telemetry", (p.topic, String::from_utf8_lossy(&p.payload)));
+                    let _ = app.emit("message", (p.topic, String::from_utf8_lossy(&p.payload)));
                 }
                 Err(_) => {
                     set_connected(false);
@@ -107,11 +116,35 @@ fn info(mqtt: State<Mqtt>) -> Value {
         .filter(|i| !i.is_loopback() && i.ip().is_ipv4())
         .map(|i| json!({ "name": i.name, "ip": i.ip().to_string() }))
         .collect();
+    // The page asks for this once it listens (again, after a reload). Retained messages (the
+    // station's state) that came in before that were lost, and a broker only sends them for a new
+    // subscription (rumqttd ignores a repeated one), so drop the filter and take it again.
+    let _ = mqtt.client.try_unsubscribe("+/+/+");
+    let _ = mqtt.client.try_subscribe("+/+/+", QoS::AtMostOnce);
     json!({
         "ownBroker": mqtt.own_broker,
         "connected": CONNECTED.load(Ordering::Relaxed),
         "port": PORT,
         "addresses": addresses,
+        "ai": ai_settings(),
+        "shortcut": SHORTCUT_TAKEN.load(Ordering::Relaxed).then_some(SHORTCUT),
+    })
+}
+
+/// GROQ_API_KEY and GROQ_API_KEY1..9 from the shell that started the app; the page tries them in
+/// turn (a key's org has to accept each model's terms, TTS included). STUDYSPHERE_LLM_URL and
+/// STUDYSPHERE_LLM_MODEL swap the chat model, e.g. http://localhost:11434/v1 for Ollama.
+fn ai_settings() -> Value {
+    let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+    let keys: Vec<String> = std::iter::once("GROQ_API_KEY".to_string())
+        .chain((1..=9).map(|i| format!("GROQ_API_KEY{i}")))
+        .filter_map(|k| env(&k))
+        .collect();
+    json!({
+        "groqKeys": keys,
+        "llmUrl": env("STUDYSPHERE_LLM_URL").unwrap_or_else(|| "https://api.groq.com/openai/v1".into()),
+        "llmModel": env("STUDYSPHERE_LLM_MODEL").unwrap_or_else(|| "openai/gpt-oss-120b".into()),
+        "llmKey": env("STUDYSPHERE_LLM_KEY"),
     })
 }
 
@@ -227,10 +260,38 @@ fn watch_pointer_leaving(window: &WebviewWindow) {
 
 fn main() {
     let own_broker = start_broker();
-    tauri::Builder::default()
+    let wayland = cfg!(target_os = "linux") && std::env::var_os("WAYLAND_DISPLAY").is_some();
+    let mut builder = tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, args, _| {
+        if args.iter().any(|a| a == "--talk") {
+            let _ = app.emit("talk", ());
+        }
+    }));
+    if !wayland {
+        use tauri_plugin_global_shortcut::ShortcutState;
+        builder = builder.plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _, event| {
+                    if event.state == ShortcutState::Pressed {
+                        let _ = app.emit("talk", ());
+                    }
+                })
+                .build(),
+        );
+    }
+    builder
+        // The mic records in the page; without this WebKitGTK denies it outright.
+        .on_permission_request(|_, kind| match kind {
+            PermissionKind::Microphone => PermissionResponse::Allow,
+            _ => PermissionResponse::Default,
+        })
         .setup(move |app| {
             let client = connect(app.handle().clone());
             app.manage(Mqtt { client, own_broker });
+            if !wayland {
+                // Another app may hold it already; the mic button and --talk still work then.
+                use tauri_plugin_global_shortcut::GlobalShortcutExt;
+                SHORTCUT_TAKEN.store(app.global_shortcut().register(SHORTCUT).is_ok(), Ordering::Relaxed);
+            }
             // Before the window is first shown: a shown window can't become a layer surface.
             #[cfg(target_os = "linux")]
             if let Some(window) = app.get_webview_window("island") {

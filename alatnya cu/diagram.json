@@ -55,7 +55,7 @@
       "attrs": {}
     },
     {
-      "type": "wirelab-fan",
+      "type": "chip-dc-fan",
       "id": "fan",
       "top": 150,
       "left": -300,

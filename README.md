@@ -179,6 +179,8 @@ STUDYSPHERE_LLM_URL=http://localhost:11434/v1 STUDYSPHERE_LLM_MODEL=nama-model-s
 
 Model menerima system prompt berisi data ruangan terbaru dan daftar perintah yang boleh dipakai, lalu harus menjawab satu objek JSON: `{"say": "...", "mood": "happy", "command": {"lamp": "on"}}` (`command` boleh `null`). Data latih SFT sebaiknya memakai format yang sama. Di Windows, Ollama perlu `OLLAMA_ORIGINS=*` supaya bisa dipanggil dari aplikasi. Whisper dan suara tetap memakai Groq sampai ada pengganti lokal.
 
+Screenshot island (tersembunyi, satu baris, terbuka) ada di `desktop/screenshots/`.
+
 Di Linux, island memakai layer-shell supaya tetap di atas layar (KDE, Hyprland, Sway, COSMIC). Pasang `gtk-layer-shell` (Arch) atau `libgtk-layer-shell0` (Debian/Ubuntu). Tanpa itu, atau di GNOME, island menjadi jendela biasa yang selalu di atas, dan posisinya ditentukan oleh desktop.
 
 Syarat untuk build: [Rust](https://rustup.rs), Node.js, dan prasyarat Tauri untuk sistemnya ([daftar lengkap](https://v2.tauri.app/start/prerequisites/)): di Linux `webkit2gtk-4.1`, di Windows Microsoft C++ Build Tools (WebView2 sudah ada di Windows 10 dan 11).
@@ -215,6 +217,15 @@ Simulator lokal mensimulasikan perilaku, bukan chip-nya: timing sinyal DHT11 dan
 arduino-cli compile --fqbn esp32:esp32:esp32 --output-dir firmware/build firmware
 wokwi-cli --scenario test.scenario.yaml --timeout 60000 .
 ```
+
+### Stasiun ESP32 + UNO (`alatnya cu/`) di WireLab
+
+`alatnya cu/` juga proyek WireLab sendiri: buka folder itu di WireLab (**Open…**), lalu tekan **Run**. Rangkaiannya (`alatnya cu/diagram.json`) sama dengan alat fisiknya. ESP32 memakai DHT11, HC-SR04, servo SG90 dan LCD; UNO memakai MQ-135, modul LDR, LCD dan kipas di D13+D12; keduanya tersambung lewat UART D1→GPIO27 dan GPIO26→D0. Kedua sketch dijalankan apa adanya, tanpa diubah.
+
+- `wirelab.json` menentukan sketch untuk tiap board (`"boards"`) dan mengalihkan `MQTT_HOST` di sketch ESP32 (`192.168.1.10`) ke broker aplikasi desktop di laptop ini (`"hosts"`).
+- Saat simulasi berjalan, klik part untuk mengatur jarak HC-SR04, cahaya, MQ-135, serta suhu dan kelembapan. Kipas berputar saat menyala, servo ikut bergerak, dan kedua LCD tampil.
+- Simulasi memakai `DEVICE_ID` yang sama dengan alat fisik (`station01`). Matikan alat fisiknya dulu supaya perintah dari desktop tidak sampai ke dua-duanya.
+- MQ-135 tetap butuh pemanasan 2 menit (`MQ_WARMUP_MS` di sketch UNO), sama seperti di alat fisik.
 
 ### Di ESP32 asli
 
@@ -254,6 +265,8 @@ mosquitto_pub -h localhost -t studysphere/room-01/command -m '{"lcd":"Waktunya i
 firmware/firmware.ino   program ESP32
 firmware/config.h       WiFi, broker MQTT, topik
 desktop/                aplikasi desktop dan broker MQTT (Tauri)
+desktop/screenshots/    screenshot UI desktop
+alatnya cu/             stasiun ESP32 + UNO, dengan proyek WireLab-nya
 hardware/               skematik, PCB dan library KiCad 10
 hardware/fab/           PDF skematik, BOM, Gerber, render PCB
 diagram.json            rangkaian (WireLab / Wokwi)

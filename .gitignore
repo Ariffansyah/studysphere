@@ -4,3 +4,4 @@ hardware/*.kicad_prl
 hardware/*.lck
 hardware/*-backups/
 hardware/fp-info-cache
+alatnya cu/build/

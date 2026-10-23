@@ -52,10 +52,10 @@
 #include "driver/gpio.h"
 
 // ============================== KONFIGURASI =================================
-const char* WIFI_SSID = "ISI_SSID_WIFI";
-const char* WIFI_PASS = "ISI_PASSWORD_WIFI";
+const char* WIFI_SSID = "cu";
+const char* WIFI_PASS = "12345678";
 
-const char*    MQTT_HOST = "192.168.1.10";   // IP PC yang menjalankan EMQX
+const char*    MQTT_HOST = "10.46.210.161";   // IP PC yang menjalankan EMQX
 const uint16_t MQTT_PORT = 1883;
 const char*    MQTT_USER = "";                // kosongkan jika EMQX tanpa auth
 const char*    MQTT_PASS = "";

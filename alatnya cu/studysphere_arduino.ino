@@ -2,7 +2,7 @@
  * ============================================================================
  *  StudySphere — Node Sensor + Kipas (Arduino UNO)
  * ============================================================================
- *  Peran:
+ *  Peran
  *    Node sensor sekunder + aktuator kipas. Membaca MQ-135 dan modul
  *    "MH Sensor Series", menampilkan status di LCD 16x2 I2C, menyalakan/mematikan
  *    kipas atas perintah ESP32, dan HANYA mengirim data ke ESP32 bila diminta

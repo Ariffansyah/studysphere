@@ -33,8 +33,8 @@
     {
       "type": "wokwi-servo",
       "id": "vent",
-      "top": -75,
-      "left": -362,
+      "top": -123,
+      "left": -397,
       "rotate": 180,
       "attrs": {}
     },
